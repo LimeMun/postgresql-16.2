@@ -1,0 +1,1 @@
+/home/vldb/postgresql-16.2/src/test/modules/spgist_name_ops/Makefile

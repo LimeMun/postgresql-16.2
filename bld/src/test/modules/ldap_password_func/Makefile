@@ -1,0 +1,1 @@
+/home/vldb/postgresql-16.2/src/test/modules/ldap_password_func/Makefile

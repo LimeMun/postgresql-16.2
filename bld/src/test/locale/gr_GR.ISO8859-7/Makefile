@@ -1,0 +1,1 @@
+/home/vldb/postgresql-16.2/src/test/locale/gr_GR.ISO8859-7/Makefile

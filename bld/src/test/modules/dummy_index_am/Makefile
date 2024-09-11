@@ -1,0 +1,1 @@
+/home/vldb/postgresql-16.2/src/test/modules/dummy_index_am/Makefile

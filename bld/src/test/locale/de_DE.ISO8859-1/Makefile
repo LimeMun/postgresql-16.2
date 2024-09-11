@@ -1,0 +1,1 @@
+/home/vldb/postgresql-16.2/src/test/locale/de_DE.ISO8859-1/Makefile
