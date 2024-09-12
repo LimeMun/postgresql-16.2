@@ -3389,6 +3389,13 @@ FlushBuffer(BufferDesc *buf, SMgrRelation reln, IOObject io_object,
 	 */
 	recptr = BufferGetLSN(buf);
 
+	BufferTag *pBuftag = &buf->tag;
+	int spcOid = pBuftag->spcOid;
+	int dbOid = pBuftag->dbOid;
+	int relNumber = pBuftag->relNumber;
+	int forkNum = pBuftag->forkNum;
+	int blockNum = pBuftag->blockNum;
+
 	/* To check if block content changes while flushing. - vadim 01/17/97 */
 	buf_state &= ~BM_JUST_DIRTIED;
 	UnlockBufHdr(buf, buf_state);
@@ -3410,9 +3417,14 @@ FlushBuffer(BufferDesc *buf, SMgrRelation reln, IOObject io_object,
 	 * disastrous system-wide consequences.  To make sure that can't happen,
 	 * skip the flush if the buffer isn't permanent.
 	 */
+	int logFlushSize = 0;
 	if (buf_state & BM_PERMANENT)
-		XLogFlush(recptr);
+	  logFlushSize = XLogFlushFromBuffer(recptr);
 
+	if(logFlushSize > 0) {
+	  printf("spcOid:%d, dbOid:%d, relNumber:%d, forkNum:%d, blockNum:%d, logFlushSize: %d\n", spcOid, dbOid,
+			 relNumber, forkNum, blockNum, logFlushSize);
+	}
 	/*
 	 * Now it's safe to write buffer to disk. Note that no one else should
 	 * have been able to write it while we were busy with log flushing because

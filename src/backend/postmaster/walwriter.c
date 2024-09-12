@@ -251,9 +251,12 @@ WalWriterMain(void)
 		 * Do what we're here for; then, if XLogBackgroundFlush() found useful
 		 * work to do, reset hibernation counter.
 		 */
-		if (XLogBackgroundFlush())
-			left_till_hibernate = LOOPS_UNTIL_HIBERNATE;
-		else if (left_till_hibernate > 0)
+	  // turn off background flusher
+//		if (XLogBackgroundFlush())
+//			left_till_hibernate = LOOPS_UNTIL_HIBERNATE;
+//		else if (left_till_hibernate > 0)
+//			left_till_hibernate--;
+	  if (left_till_hibernate > 0)
 			left_till_hibernate--;
 
 		/* report pending statistics to the cumulative stats system */
