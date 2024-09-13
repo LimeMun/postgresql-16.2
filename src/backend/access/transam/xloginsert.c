@@ -531,6 +531,17 @@ XLogInsert(RmgrId rmid, uint8 info)
  * *topxid_included is set if the topmost transaction ID is logged with the
  * current subtransaction.
  */
+
+
+// 여기서 핵심은 다음과 같음
+// 1. XLogRecordAssemble 함수는, 특정 트랜잭션이 업데이트한 모든 블럭(페이지 내 데이터)에 대한 정보를 순차적으로 rdata라는 linked list에 저장함
+// 2. XLogRecordAssemble 함수에서 각 블럭에 대한 정보가 작성되며, 그 블럭이 속한 페이지 정보는 XLogRecordBlockHeader, RelFileLocator라는 것에 저장됨
+// 단, Page 전체를 WAL로 작성하는 경우는, RelFileLocator가 아닌 Page 자체를 저장함
+// 3. 그리고 이렇게 작성된 rdata는 CopyXLogRecordToWAL 함수를 통해 WAL Buffer로 복사됨
+// 4. 그렇기 때문에 XLogRecordAssemble함수에서 각 블럭에 대한 정보와 쓰여지는 로그의 크기를 파악할 수 있음.
+// 5. 결론적으로, XLogRecordAssemble함수에서 저장하는 XLogRecordBlockHeader, RelFileLocator를 활용해서 Buffer_Tag 객체를 생성할 수 있고 Buffer Page를 찾아낼 수 있음
+// 6. 자세하게하자면 InitBufferTag로 Buffer Tage 생성 -> BufTableHashCode로 Buffer Table Hash Code 생성 -> BufTableLookup으로 Buffer Table에서 Buffer Block 찾기
+
 static XLogRecData *
 XLogRecordAssemble(RmgrId rmid, uint8 info,
 				   XLogRecPtr RedoRecPtr, bool doPageWrites,
@@ -584,6 +595,8 @@ XLogRecordAssemble(RmgrId rmid, uint8 info,
 		bool		samerel;
 		bool		is_compressed = false;
 		bool		include_image;
+
+		uint64 cumulative_log_len = 0;
 
 		if (!regbuf->in_use)
 			continue;
@@ -770,6 +783,7 @@ XLogRecordAssemble(RmgrId rmid, uint8 info,
 			}
 
 			total_len += bimg.length;
+			cumulative_log_len += bimg.length;
 		}
 
 		if (needs_data)
@@ -788,6 +802,9 @@ XLogRecordAssemble(RmgrId rmid, uint8 info,
 			bkpb.data_length = (uint16) regbuf->rdata_len;
 			total_len += regbuf->rdata_len;
 
+			// Log 더하기
+			cumulative_log_len += regbuf->rdata_len;
+
 			rdt_datas_last->next = regbuf->rdata_head;
 			rdt_datas_last = regbuf->rdata_tail;
 		}
@@ -802,6 +819,7 @@ XLogRecordAssemble(RmgrId rmid, uint8 info,
 		prev_regbuf = regbuf;
 
 		/* Ok, copy the header to the scratch buffer */
+
 		memcpy(scratch, &bkpb, SizeOfXLogRecordBlockHeader);
 		scratch += SizeOfXLogRecordBlockHeader;
 		if (include_image)
@@ -822,6 +840,23 @@ XLogRecordAssemble(RmgrId rmid, uint8 info,
 		}
 		memcpy(scratch, &regbuf->block, sizeof(BlockNumber));
 		scratch += sizeof(BlockNumber);
+
+		if(needs_data){
+			Oid spcOid = regbuf->rlocator.spcOid;
+			Oid dbOid = regbuf->rlocator.dbOid;
+			RelFileNumber relNumber = regbuf->rlocator.relNumber;
+			ForkNumber forkNum = regbuf->forkno;
+			BlockNumber blockNum = regbuf->block;
+			fprintf(stderr, "Write Update, spcOid:%d, dbOid:%d, relNumber:%d, forkNum:%d, blockNum:%d, log_size: %d\n", spcOid, dbOid, relNumber, forkNum, blockNum, cumulative_log_len);
+		}
+		else if(include_image){
+			Oid spcOid = regbuf->rlocator.spcOid;
+			Oid dbOid = regbuf->rlocator.dbOid;
+			RelFileNumber relNumber = regbuf->rlocator.relNumber;
+			ForkNumber forkNum = regbuf->forkno;
+			BlockNumber blockNum = regbuf->block;
+			fprintf(stderr, "Write Full Page, spcOid:%d, dbOid:%d, relNumber:%d, forkNum:%d, blockNum:%d, log_size: %d\n", spcOid, dbOid, relNumber, forkNum, blockNum, cumulative_log_len);
+		}
 	}
 
 	/* followed by the record's origin, if any */
