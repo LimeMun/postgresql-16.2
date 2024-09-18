@@ -41,6 +41,9 @@
 #include "storage/proc.h"
 #include "utils/memutils.h"
 
+// NV-PPL
+#include "storage/buf_internals.h"
+
 /*
  * Guess the maximum buffer size required to store a compressed version of
  * backup block image.
@@ -841,23 +844,49 @@ XLogRecordAssemble(RmgrId rmid, uint8 info,
 		memcpy(scratch, &regbuf->block, sizeof(BlockNumber));
 		scratch += sizeof(BlockNumber);
 
-		if(needs_data){
+		// NV-PPL
+		if (needs_data || include_image)
+		{
 			Oid spcOid = regbuf->rlocator.spcOid;
 			Oid dbOid = regbuf->rlocator.dbOid;
 			RelFileNumber relNumber = regbuf->rlocator.relNumber;
 			ForkNumber forkNum = regbuf->forkno;
 			BlockNumber blockNum = regbuf->block;
-			fprintf(stderr, "Write Update, spcOid:%d, dbOid:%d, relNumber:%d, forkNum:%d, blockNum:%d, log_size: %d\n", spcOid, dbOid, relNumber, forkNum, blockNum, cumulative_log_len);
+
+			/* BufferTag 생성 */
+			BufferTag tag;
+			uint32 newHash;
+			InitBufferTag(&tag, &regbuf->rlocator, forkNum, blockNum);
+			newHash = BufTableHashCode(&tag);
+			/* BufferDesc 찾기 */
+			int buf_id = BufTableLookup(&tag, newHash);
+			if (buf_id >= 0) {
+				BufferDesc *bufHdr = GetBufferDescriptor(buf_id);
+
+				/* BufferDesc 사용 */
+				if (bufHdr != NULL) {
+					if(include_image){
+						// bufHdr->overall_cumulative_log_len += cumulative_log_len;
+						// bufHdr->overall_log_count++;
+						// fprintf(stderr, "Overall All Log, spcOid:%d, dbOid:%d, relNumber:%d, forkNum:%d, blockNum:%d, log_size: %u, log_count: %u\n",
+						// 		spcOid, dbOid, relNumber, forkNum, blockNum, bufHdr->cumulative_log_len, bufHdr->log_count);				
+					}
+					else{
+						bufHdr->cumulative_log_len += cumulative_log_len;
+						bufHdr->log_count++;
+						// fprintf(stderr, "Only Log, spcOid:%d, dbOid:%d, relNumber:%d, forkNum:%d, blockNum:%d, log_size: %u, log_count: %u\n",
+						// 		spcOid, dbOid, relNumber, forkNum, blockNum, bufHdr->cumulative_log_len, bufHdr->log_count);	
+					}
+				} else {
+					fprintf(stderr, "Buffer not found in buffer pool.\n");
+				}
+			} else {
+				fprintf(stderr, "Buffer not found in buffer pool.\n");
+			}
 		}
-		else if(include_image){
-			Oid spcOid = regbuf->rlocator.spcOid;
-			Oid dbOid = regbuf->rlocator.dbOid;
-			RelFileNumber relNumber = regbuf->rlocator.relNumber;
-			ForkNumber forkNum = regbuf->forkno;
-			BlockNumber blockNum = regbuf->block;
-			fprintf(stderr, "Write Full Page, spcOid:%d, dbOid:%d, relNumber:%d, forkNum:%d, blockNum:%d, log_size: %d\n", spcOid, dbOid, relNumber, forkNum, blockNum, cumulative_log_len);
-		}
+
 	}
+	// NV-PPL
 
 	/* followed by the record's origin, if any */
 	if ((curinsert_flags & XLOG_INCLUDE_ORIGIN) &&

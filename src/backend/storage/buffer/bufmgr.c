@@ -1370,6 +1370,12 @@ BufferAlloc(SMgrRelation smgr, char relpersistence, ForkNumber forkNum,
 
 	victim_buf_hdr->tag = newTag;
 
+	//NV-PPL
+	// victim_buf_hdr->overall_cumulative_log_len = 0;
+	// victim_buf_hdr->overall_log_count = 0;
+	victim_buf_hdr->cumulative_log_len = 0;
+	victim_buf_hdr->log_count = 0;
+
 	/*
 	 * Make sure BM_PERMANENT is set for buffers that must be written at every
 	 * checkpoint.  Unlogged buffers only need to be written at shutdown
@@ -3475,6 +3481,11 @@ FlushBuffer(BufferDesc *buf, SMgrRelation reln, IOObject io_object,
 
 	/* Pop the error context stack */
 	error_context_stack = errcallback.previous;
+
+	//NV-PPL
+	fprintf(stderr, "Only Log,%u,%u\n",buf->cumulative_log_len, buf->log_count);
+	buf->cumulative_log_len = 0;
+	buf->log_count = 0;	
 }
 
 /*

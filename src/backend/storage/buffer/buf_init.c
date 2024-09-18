@@ -131,6 +131,11 @@ InitBufferPool(void)
 			 * management of this list is done by freelist.c.
 			 */
 			buf->freeNext = i + 1;
+			// NV-PPL
+			// buf->overall_cumulative_log_len = 0;
+			// buf->overall_log_count = 0;
+			buf->cumulative_log_len = 0;
+			buf->log_count = 0;
 
 			LWLockInitialize(BufferDescriptorGetContentLock(buf),
 							 LWTRANCHE_BUFFER_CONTENT);

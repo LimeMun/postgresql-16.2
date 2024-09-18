@@ -245,6 +245,12 @@ typedef struct BufferDesc
 {
 	BufferTag	tag;			/* ID of page contained in buffer */
 	int			buf_id;			/* buffer's index number (from 0) */
+	
+	// NV-PPL
+	// uint32		overall_cumulative_log_len;	/* cumulative log length */
+	// uint32 		overall_log_count;
+	uint32		cumulative_log_len;	/* cumulative log length */
+	uint32		log_count;
 
 	/* state of the tag, containing flags, refcount and usagecount */
 	pg_atomic_uint32 state;
